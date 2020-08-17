@@ -1,0 +1,38 @@
+#!/bin/tcsh
+#
+if ( $#argv == 0 ) then
+echo "                                      "
+echo  " USAGE :   sh_pppfang week1 week2 "
+echo  "                                     "
+endif
+#
+set startwk=$1
+set stopwk=$2
+#
+while ( $startwk <= $stopwk )
+
+  if  ($startwk < 1000) then
+     set gpswk = 0$startwk
+  else
+     set gpswk = $startwk
+  endif
+
+if ( -d $ANALYSIS/$gpswk/flt ) then
+echo week-$startwk
+cd $ANALYSIS/$gpswk/orbit
+gunzip -f *gz
+cd $ANALYSIS/$gpswk/flt
+
+chmod +x make-flt-ppp
+./make-flt-ppp >> /new_disk_dir/ppplog/$startwk.log
+#select
+rm $ANALYSIS/$gpswk/flt/*.postlog
+rm $ANALYSIS/$gpswk/flt/*.postfit
+rm $ANALYSIS/$gpswk/flt/*.smsol
+rm $ANALYSIS/$gpswk/reg/*
+@ startwk = $startwk + 1
+else
+ @ startwk = $startwk + 1
+endif
+end
+exit

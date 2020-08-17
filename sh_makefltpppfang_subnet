@@ -1,0 +1,71 @@
+#!/bin/csh
+#
+if ( $#argv == 0 ) then
+echo "                                      "
+echo  " USAGE :   sh_makefltpppfang week1 week2 subnet"
+echo  "                                     "
+endif
+#
+set startwk=$1
+set stopwk=$2
+set solution = $3
+#
+#qmnamesup2low
+while ( $startwk <= $stopwk )
+
+  if  ($startwk < 1000) then
+     set gpswk = 0$startwk
+  else
+     set gpswk = $startwk
+  endif
+
+if ( -d $ANALYSIS/$gpswk/qm ) then
+echo $startwk
+cd $ANALYSIS/$gpswk/flt
+echo "#\!/bin/tcsh " > make-flt-ppp
+echo "#"  >> make-flt-ppp
+echo "setenv CAMP $ANALYSIS/$gpswk" >> make-flt-ppp
+echo "#"  >> make-flt-ppp
+
+set STAS = `cat $SUBNETS/$solution.subnet`
+#echo $STAS
+#  Get a list of all stations with qm files for this day
+#    Make sure every name has a space before and after it (add spaces at
+#    beginning and end of string).
+
+#
+#  Now run a PPP solution for each station on our list IF
+#     (1) a qm file exists for this station
+#     (2) The solution has not already been run (if we are in update mode)
+#
+cd $ANALYSIS/$gpswk/qm
+gunzip -f *.gz
+foreach STA ( $STAS )
+
+#   sta is station name in lowercase, padded to 4 chars with underscores
+
+   set sta = `echo $STA | tr '[A-Z]' '[a-z]'`
+   set sta = `pad_id4 $sta`
+#echo $sta
+#  If a qm file exists, then run or update the PPP solution for that site
+foreach qmfile (`ls *${sta}*.qm`)
+#echo $qmfile 
+#echo $qmfile 
+ #  if ( `echo $qmfile | grep $sta | wc -l` > 0 ) then
+	if ( `echo $qmfile | wc -l` > 0 ) then
+      set out = `basename $qmfile .qm`
+      echo " pppsolvefang  $out  -nf -delsat GPS62 -delsat GPS63 -tropmap GMF -oceanload tpxo7only_CM -apriori_trop GPT -use_domes -use_azel">>../flt/make-flt-ppp
+   else
+      echo "No qm file for site $STA"
+   endif
+end
+end
+
+cd ../flt
+##
+chmod +x make-flt-ppp
+@ startwk = $startwk + 1
+else
+ @ startwk = $startwk + 1
+endif
+end

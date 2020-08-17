@@ -1,0 +1,14 @@
+#!/bin/tcsh
+#from pfiles to ts files(time,x,y,z)for matlab input 
+foreach site (`ls *.pfiles`)
+	echo $site
+	awk '{print $1,$4,$5,$6}' $site>$site.ts
+	#awk '{print $1}' $site>t.tmp
+	#llh2xyz
+	#llh2xyz_fang $site.llh
+	#paste $site.llh $site.xyz>$site.llhxy
+	#paste $site.llhxy t.tmp>$site.llhxyz
+	#awk '{print $7,$4,$5,$3}' $site.llhxyz>$site.ts
+
+end
+mv *.ts ../tsfile

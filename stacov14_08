@@ -1,0 +1,28 @@
+#!/bin/tcsh
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Generate time: 2020年 08月 05日 星期三 17:26:58 CST
+#===============================================================================
+#Main program
+#Usage: 
+foreach stacov (`ls *IGS14.stacov`)
+	set ymd=`echo $stacov|cut -c1-7`
+	set nm=`basename $stacov IGS14.stacov`
+	set dyr=`ymd2dyr $ymd`
+	set dyear=`echo "scale=4;$dyr - 2010"|bc`
+#	echo $dyear
+#meters
+	set dv=-0.0001
+	set v=0.0024
+	set corrv=`echo "scale=15;$v + $dv * $dyear"|bc`
+#	echo $corrv
+	set z=`awk '{if(FNR==4)print $5}' $stacov`
+	set zc=`awk '{if(FNR==4)printf "%22.15fE+07\n",($5+"'"$corrv"'")/10000000}' $stacov`
+	set za=`awk '{if(FNR==4)print $7}' $stacov`
+	set staname=`awk '{if(FNR==4)print $2}' $stacov`
+	echo $zc
+	echo $za
+	#awk '{ gsub(/"'"$z"'"/,"'"$zc"'"); print $0 }' $stacov>${nm}IGb08.stacov
+    awk -v zc=$zc -v za=$za -v sta=$staname '{ if(FNR==4) {printf "    3  %s STA Z         %s  +-  %s\n",sta,zc,za} else {print $0}}' $stacov>${nm}IGb08.stacov
+#awk '{ if(FNR==4) sub($5,"'"$zc"'",$5); print $0 }' 17aug08lhas____0b_IGS14.stacov>IGb08.stacov
+end

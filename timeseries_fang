@@ -1,0 +1,343 @@
+#!/bin/tcsh    
+#
+# Script to plot coordinate componenets (ENU) time series 
+# from GIPSY simplifed STACOV-files (POSCOV)
+# Written originally by Qi Wang july 16, 2000; last modified by Hil Fletcher Oct 31, 2002.
+# septic.py is a script that converts lat, lon to mm on the ground relative 
+#           to a nominal value. It uses the WGS84 geoid.
+
+if ( $#argv == 0 ) then
+echo "                                                                   "
+echo " sh_gipsy_ts: Uses GMT to make a multiple panel timeseries plots   "
+echo "                                                                   "
+echo "  requirements  : GMT 4                                             "
+echo "                : python2 and septic.py                             "
+echo "                                                                   "
+echo "  USAGE :    sh_gipsy_ts   <options>                               "
+echo "                                                                   "
+echo "  EXAMPLES:                                                        "
+echo "  timeseries_fang  -f Tibet.pfile -d -s WUHN                              "
+echo "                                                                   "
+echo "=+=+=+=+=+=+=+=+=+=+=+=+=+ OPTIONS +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+="
+echo "                                                                   "
+echo " -f[ile]       file    : Input File listing POSCOV files.          "
+echo "                                                                   "
+echo " -s[ite]       list    : Argument for Site. MUST have it.          "
+echo "                                                                   "
+echo " -frame      value     : gmt border day-axis frame  ticks. Default "
+echo "                         is  0.5                                   "
+echo "                                                                   "
+echo " -anot       value     : gmt border day-axis label intervals.      "
+echo "                         Default is  1                             "
+echo "                                                                   "
+echo " -c[ol]                : plots are in color                        "
+echo "                                                                   "
+echo " -l[ine]     value     : removes a specific velocity               "
+echo "                         give N E U velocity in mm/yr              "
+echo "                                                                   "
+echo " -d[etrend]            : detrends timeseries                       " 
+echo "                                                                   "
+exit
+endif
+#
+##################### SET UP DEFAULTS ############################################################
+set xmin     =  0
+set xmax     =  0
+set ymin     =  0
+set ymax     =  0
+set order    =  0
+set frame    =  0.5
+set anot     = 1
+set unc_scale = 1
+set ofiles   = ""
+set baselines   = ""
+set ADD = ""
+set time_series = yes 
+set delete = ""   
+set delete_file = ""
+set free      =  yes
+set fixed     =  no
+set col       =  no
+set line      =  no
+set detrend   =  no
+set final	  =  no
+set dotps	  = "original.ps"
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+# decipher command line
+while ($#argv > 0 )
+ set input = ( $argv )
+ switch($input[1])
+        case -f:
+        case -file:
+		set file     =   $input[2] 
+		breaksw
+        case -anot:
+                set anot     =   $input[2]
+                breaksw
+        case -frame:
+                set frame    =   $input[2]
+                breaksw
+		case -s:
+		case -site:
+				set sites     =   $input[2]  
+                echo $sites
+				breaksw
+        case -c:
+        case -col:
+                set col = yes
+                breaksw
+        case -l:
+        case -line:
+                set slopeN = $input[2]
+                set slopeE = $input[3]
+                set slopeU = $input[4]
+                set line = yes
+                breaksw
+        case -final:     
+                set final = yes
+                breaksw
+        case -d:
+        case -detrend:
+                set detrend = yes
+                breaksw
+        case -co:
+        case -corrected:
+                set dotps	  = "corrected.ps"
+                breaksw
+        case -o:
+        case -ofiles:
+                set ofiles   =   ( $ofiles $input[2] )
+                echo $ofiles
+                shift input; shift input
+                while ( $#input > 0 &&   `echo  $input[1]  | cut -c1 ` != "-" )
+                        set inarg =  $input[1]
+                        if ( `echo  $inarg | cut -c1 ` != "-" ) then
+                                set ofiles    =   ( $ofiles $inarg )
+                                if ( $#input == 0 ) goto alldone
+                                shift input
+                        endif
+                end
+ if ( $#input == 0 ) goto alldone
+                        breaksw
+ endsw
+ if ( $#argv > 0 ) shift argv
+end
+alldone:
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
+
+if ( -e  $sites".pfiles" ) then
+  echo " "
+  echo "Warning : Using an existing POSCOV-files --- "$sites".pfiles"
+  echo " "
+  echo " "
+else
+  echo " "
+  echo "PROCESSING gispy simplified Stacov/poscov-files"
+  echo " "
+  if ( -e tmp.pfile )/bin/rm tmp.pfile
+	set sitelow = `echo $sites | tr "[A-Z]" "[a-z]"`
+  foreach olist ( `ls *${sitelow}*.poscov` )
+   cat $olist | egrep $sites  >>! tmp.pfile
+  end
+  cat tmp.pfile |sort | grep -v "*">! tmp.0
+  /bin/mv tmp.0 $sites".pfiles"
+endif
+set PAGE = 0
+set N = 1
+set COL = 1
+set i = 1
+
+set psfile = $sites"_"$dotps
+
+\rm -r $psfile.* >&! /dev/null
+
+
+# scaling/title  information
+  gmtdefaults -D >! .gmtdefaults
+  gmtset      LABEL_FONT_SIZE    8
+  gmtset      ANOT_FONT_SIZE     8
+  gmtset      FRAME_PEN          2
+  gmtset      TICK_LENGTH       -0.1
+  gmtset      FRAME_WIDTH        0.1
+  gmtset      DOTS_PR_INCH       600
+  gmtset      MEASURE_UNIT       cm     
+
+#
+cat $sites".pfiles" |  awk '{printf" %s %15.8f %6.2f %15.4f \n",$1,$4, $7, $5}' >! tmp.datE
+cat $sites".pfiles" |  awk '{printf" %s %15.8f  %6.2f \n",$1,$5, $8}' >! tmp.datN
+septic.py                   
+\mv tmp.datE.new tmp.datE
+\mv tmp.datN.new tmp.datN
+cat $sites".pfiles" |  awk '{printf" %s %15.8f  %6.2f \n",$1,$6*1000.0,$9}' >! tmp.datU
+#
+if ( `cat tmp.datN | wc | awk '{print $1}' ` < 2 ) exit 
+if ( `cat tmp.datE | wc | awk '{print $1}' ` < 2 ) exit
+if ( `cat tmp.datU | wc | awk '{print $1}' ` < 2 ) exit 
+#
+# Title
+#
+set Latitude  = `head -1  $sites".pfiles" | awk '{printf"%8.2f", $5}'` 
+set Longitude = `head -1  $sites".pfiles" | awk '{printf"%8.2f", $4}'` 
+set Height    = `head -1  $sites".pfiles" | awk '{printf"%8.2f", $6}'` 
+set First_YR    = `head -1  $sites".pfiles" | awk '{printf"%8.1f", $1}'` 
+set Last_YR    = `tail -1  $sites".pfiles" | awk '{printf"%8.1f", $1}'` 
+set nobs      = `cat  $sites".pfiles" | wc -l` 
+set date_of_time_series = `date` 
+set username = `whoami`
+#
+echo "DRAWING A POST-SCRIPT IMAGE WITH GMT V3.0 ... "
+echo "--------------------------------------------- "
+#
+pstext <<ENDD  -H0  -R0/21/0/28   -Jx1  -P  -K  -X0 -Y01        >! $psfile
+1  26.5 8 0 0   9   Time Series of Site Position drawn by $username at GI/UAF, $date_of_time_series
+ENDD
+#
+pstext <<ENDD  -H0  -R0/21/0/28   -Jx1  -P  -K -O  -X4 -Y23         >> $psfile
+5   2.5 14 0 0   9           Station  : $sites     
+4   1.5 12 0 0   9           E$Longitude\312   N$Latitude\312   $Height (m) 
+4   0.5 12 0 0   9           $nobs Daily Solutions   ( $First_YR - $Last_YR )
+ENDD
+#
+#  loop for North , East and Up componenet
+#
+foreach j ( N E U  ) 
+
+ poly01 yes 1 yes < tmp.dat$j >! tmp.tail
+ set com_len = ` \tail -1  tmp.tail | awk '{print $2}'`
+ set bas_len = ` \tail -1  tmp.datE | awk '{print $2}'`
+
+ awk '{print $1,$2}' tmp.dat$j >! tmp.xy
+ sed s/'$'/"    "$unc_scale/g tmp.dat$j  >! tmp.scale
+ awk '{print $3}' tmp.scale  >! tmp.sig
+#
+#  remove 1st order poly from x,y (trend1d -N1 de-means x,y)
+#
+   set r = ( `minmax  -I1/5  -C tmp.xy  ` )
+	if ( $r[1] == $r[2]) then 
+         cat -n tmp.xy | awk '{print $2+$1/100,$3}' >! tmp.xy0 
+         \mv tmp.xy0 tmp.xy
+        endif
+
+#   Firstly multiply epoch by 100 to increse time resolution
+
+    cat  tmp.xy | awk '{print ($1-1900)*100,$2}' >! tmp.xy0 
+    trend1d tmp.xy0 -Np1 -Fxr  >! tmp.xr0 
+
+#   Secondly divide epoch by 100 to decrese time resolution
+
+    cat  tmp.xr0 | awk '{printf" %12.4f %s \n ", ($1/100.0+1900),$2}' >! tmp.xr 
+#
+#  insert sigmas in third column, checking for empty lines
+#
+   pr -m -t -s' ' tmp.xr tmp.sig | awk '{ if (NF == 3) print $0}' >! tmp.xrs
+#
+#   Remove line
+#
+  poly01 yes 1  yes   <   tmp.xrs >!  tmp.stat
+  set const = `head -1 tmp.stat | awk '{print $5}'`
+ if ($line == yes) then
+  if ( $j == N ) then
+   cat tmp.xrs | awk '{print $1, $2 - ('$slopeN'*$1 + '$const'), $3}' >! tmp.xrs0
+  else if ($j == E) then
+   cat tmp.xrs | awk '{print $1, $2 - ('$slopeE'*$1 + '$const'), $3}' >! tmp.xrs0
+  else if ($j == U) then
+   cat tmp.xrs | awk '{print $1, $2 - ('$slopeU'*$1 + '$const'), $3}' >! tmp.xrs0
+  endif
+  trend1d tmp.xrs0 -Np1 -Fxr  >! tmp.xr
+  pr -m -t -s' ' tmp.xr tmp.sig >! tmp.xrs
+ endif
+#
+#   Detrend
+#
+ if($detrend == yes) then
+  set slope = `head -1 tmp.stat | awk '{print $8}'`
+
+  cat tmp.xrs | awk '{print $1, $2 - ('$slope'*$1 + '$const'), $3}' >! tmp.xrs0
+  \mv tmp.xrs0 tmp.xrs
+ endif
+
+   set RANGE = `minmax -C  -I0.1/0.5  tmp.xrs`  
+#
+#  set some space for error bars ( vertical and horizontal span )
+#
+   set r = ( `echo $RANGE | awk '{print $1  - ($2-$1)*.01 ,$2 + ($2-$1)*.01,  $3 - ($4-$3)*.20,  $4 + ($4-$3)*.20 }' ` )
+
+   if ( $xmin != 0 ) set r[1] = $xmin 
+   if ( $xmax != 0 ) set r[2] = $xmax
+   if ( $ymin != 0 ) set r[3] = $ymin 
+   if ( $ymax != 0 ) set r[4] = $ymax
+
+   set RANGE = "-R"$r[1]"/"$r[2]"/"$r[3]"/"$r[4]
+
+    set yframe = 2.5 
+    set yanot   = 2
+    set yspread = `echo  $r[4]  $r[3] | awk '{ printf "%6d",  $1 - $2}'`
+    if ( $yspread > 20 )  set yanot  = 5
+    if ( $yspread > 40 )  set yanot  = 10
+    if ( $yspread > 80 )  set yanot  = 20
+    set  yframe = ` echo $yanot | awk '{print $1 / 2 }'`
+
+    set yl = `echo $r[4] $r[3] | awk '{ printf "%6d", ( ($1 - $2) / 100 ) + 1 }'`
+    set yanot   = ` echo $yanot   $yl |  awk '{ print  $1 * $2 }' `
+    set yframe  = ` echo $yframe  $yl |  awk '{ print  $1 * $2 }' ` 
+    set SCALE = "-Ba"$anot"f"$frame"/a"$yanot"f"$yframe
+    if ($j == U) set SCALE = '-Ba'$anot'f'$frame':Epoch_(year):/a'$yanot'f'$yframe
+#
+#  label Y axis with annotation  and frame 
+#
+#  poly01 yes 1  yes   <   tmp.xrs >!  tmp.stat
+  head -1 tmp.stat | awk '{printf"4 2 9 0 0 9 Motion rate %7.2f +- %5.2f (mm/yr) Repeatability %6.2f (mm) \n",$8,$9,$15}' >! tmp.txt
+if ( $final == yes ) then
+  if ( $j == N ) then
+  	head -1 tmp.stat | awk '{printf"%12.9f %12.9f %s %7.2f %5.2f","'"$Longitude"'","'"$Latitude"'","'"$sites"'",$8,$9}' >${sites}.velN
+  else if ($j == E) then
+  	head -1 tmp.stat | awk '{printf"%7.2f %5.2f",$8,$9}' >${sites}.velE
+  else if ($j == U) then
+  	head -1 tmp.stat | awk '{printf"%7.2f %5.2f",$8,$9}' >${sites}.velU
+  endif
+	paste ${sites}.velN ${sites}.velE ${sites}.velU > ${sites}.vel
+endif
+#
+
+pstext tmp.txt -R0/21/0/28   -JX14/04  -K -P -O  -X0.0 -Y-2.0 -N >>  $psfile	
+
+if ($col == no) then
+ if ( $j == N ) then 
+  psxy tmp.xrs -Ey0.02/1/0/0/0 -W1/0/0/0  $RANGE -Sc0.04 -JX -G0/0/0 -K -O $SCALE':Latitude (mm):WeSn'  -P -Y-5.0  >> $psfile
+  echo $RANGE
+  echo " Latitude Time Series is completed now "
+ endif
+ if ( $j == E ) then
+  psxy tmp.xrs -Ey0.02/1/0/0/0 -W1/0/0/0 $RANGE -Sc0.04 -JX -G0/0/0 -K -O $SCALE":Longitude (mm):WeSn" -P -Y-5.0 >> $psfile
+  echo $RANGE
+  echo " Longitude Time Series is completed now "
+ endif
+ if ( $j == U ) then 
+  psxy tmp.xrs -Ey0.02/1/0/0/0 -W1/0/0/0 $RANGE -Sc0.04 -JX -G0/0/0 -O $SCALE':Height (mm):WeSn'    -P -Y-5.0>> $psfile
+  echo $RANGE
+  echo " Height Time Series is completed now "
+ endif
+#
+endif
+if ($col == yes) then
+ if ( $j == N ) then
+  psxy tmp.xrs -Ey0.14/1/0/0/0 -W1  $RANGE -Sc0.10 -JX -G255/0/0 -K -O $SCALE':Latitude (mm):WeSn'  -P -Y-5.0>> $psfile
+  echo $RANGE
+  echo " Latitude Time Series is completed now "
+ endif
+ if ( $j == E ) then
+  psxy tmp.xrs -Ey0.14/1/0/0/0 -W1 $RANGE -Sc0.10 -JX -G255/0/0 -K -O $SCALE":Longitude (mm):WeSn" -P -Y-5.0 >> $psfile
+  echo $RANGE
+  echo " Longitude Time Series is completed now "
+ endif
+ if ( $j == U ) then
+  psxy tmp.xrs -Ey0.14/1/0/0/0 -W1 $RANGE -Sc0.10 -JX -G255/0/0 -O $SCALE':Height (mm):WeSn'    -P -Y-5.0>> $psfile
+  echo $RANGE
+  echo " Height Time Series is completed now "
+ endif
+#
+endif
+#########################################################
+
+#loop  for NEUL
+ end

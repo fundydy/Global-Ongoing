@@ -1,0 +1,12 @@
+#!/bin/tcsh
+#input site.pfiles.llh
+
+set site=`basename $1 .llh`
+set num=`wc -l $1|awk '{print $1}'`
+set count = 1
+while ($count <= $num)
+	set llh=`awk '{if(FNR=="'"$count"'")print $0}' $1`
+	llh2xyz $llh >> $site.xyz
+@ count++
+end
+

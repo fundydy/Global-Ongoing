@@ -1,0 +1,12 @@
+#!/bin/csh
+#http orbits from JPL_GPS_Products workingwith :ftpOrbitfang
+#exmaple:    httporbits 1001 2078
+@ start= $1
+@ end= $2
+@ count= $1
+while ($count <= $end )
+@ count1 = $count + 10
+echo "Downloading:weeks from $count to $count1"
+ftpOrbitfang -sweek $count $count1
+@ count = $count + 11
+end

@@ -1,0 +1,10 @@
+#!/bin/csh -f
+foreach site (`ls *.tenv`)
+	midas $site
+	
+end
+cat *.err>>../err.log
+cat *.vel>>../tibet.vel
+
+mkdir ../vel
+cp *.vel ../vel

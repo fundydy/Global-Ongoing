@@ -1,0 +1,7 @@
+#!/bin/tcsh
+#running under/new_disk_dir/Results_IGb08/tenv
+foreach file (`ls *.tenv`)
+	set site=`basename $file .tenv`
+	awk '{print $3,$7,$8,$9}' $file> ../tenv3/${site}.tenv3
+
+end

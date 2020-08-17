@@ -1,0 +1,39 @@
+#!/bin/csh -f
+#fundy 20200701
+#running under ori_files dir
+splitts_hector
+foreach file (`ls *.yf`)
+ 	set site=`basename $file .yf`
+ 	set num=`wc -l $file|awk '{print $1}'`
+	set count = 1
+	set refx=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_0.ts`
+	set refy=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_1.ts`
+	set refz=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_2.ts`
+	while ($count <= $num)
+		set x=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_0.ts`
+		set y=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_1.ts`
+		set z=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_2.ts`
+		set resx=`awk -v aa=$x -v bb=$refx 'BEGIN{printf "%.2f\n",aa-bb}'`
+		set resy=`awk -v aa=$y -v bb=$refy 'BEGIN{printf "%.2f\n",aa-bb}'`
+		set resz=`awk -v aa=$z -v bb=$refz 'BEGIN{printf "%.2f\n",aa-bb}'`
+		echo $resx>>${site}_0.ts0
+		echo $resy>>${site}_1.ts0
+		echo $resz>>${site}_2.ts0
+		@ count++
+	end
+	echo $site
+	paste $site.yf ${site}_0.ts0 >aaa.tmp
+	paste aaa.tmp ${site}_1.ts0 >bbb.tmp
+	paste bbb.tmp ${site}_2.ts0 >${site}.neu
+	rm *.tmp
+	rm ${site}.yf
+	rm ${site}_0.ts
+	rm ${site}_1.ts
+	rm ${site}_2.ts
+	rm ${site}*.ts0
+#delete repeat time
+	sort -k 1 -nu ${site}.neu -o ${site}.neu
+end
+
+
+

@@ -1,0 +1,48 @@
+#!/bin/csh -f
+#fundy 20200701
+#running under ori_files dir
+splitts_hector
+foreach file (`ls *.yf`)
+ 	set site=`basename $file .yf`
+	awk '{print int($1),int(365*($1-int($1))+0.5)}' $file> $site.ydoy
+ 	set num=`wc -l $file|awk '{print $1}'`
+	set count = 1
+	set refx=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_0.ts`
+	set refy=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_1.ts`
+	set refz=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_2.ts`
+	while ($count <= $num)
+		set x=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_0.ts`
+		set y=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_1.ts`
+		set z=`awk '{if(FNR=="'"$count"'")print $0}' ${site}_2.ts`
+		set resx=`awk -v aa=$x -v bb=$refx 'BEGIN{printf "%.2f\n",aa-bb}'`
+		set resy=`awk -v aa=$y -v bb=$refy 'BEGIN{printf "%.2f\n",aa-bb}'`
+		set resz=`awk -v aa=$z -v bb=$refz 'BEGIN{printf "%.2f\n",aa-bb}'`
+		echo $resx>>${site}_0.ts0
+		echo $resy>>${site}_1.ts0
+		echo $resz>>${site}_2.ts0
+		set yf=`awk '{if(FNR=="'"$count"'")print $0}' $site.ydoy`
+		set date0=`ydoy2date_hector $yf`
+		#echo date0
+		date2mjd $date0 |grep "MJD"|awk '{print $3}'>> $site.mjd
+		@ count++
+	end
+	echo $site
+	paste $site.mjd ${site}_0.ts0 >${site}_0.mom
+	paste $site.mjd ${site}_1.ts0 >${site}_1.mom
+	paste $site.mjd ${site}_2.ts0 >${site}_2.mom
+	rm *.ts0
+	sed -i '1i\# sampling period 1.0' ${site}*.mom
+#delete repeat time
+	sort -k 1 -nu ${site}_0.mom -o ${site}_0.mom
+	sort -k 1 -nu ${site}_1.mom -o ${site}_1.mom
+	sort -k 1 -nu ${site}_2.mom -o ${site}_2.mom
+end
+cp -f *.mom ../raw_files
+rm *.yf
+rm *_0.ts
+rm *_1.ts
+rm *_2.ts
+rm *.mom
+rm *.mjd
+
+

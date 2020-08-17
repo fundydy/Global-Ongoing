@@ -1,0 +1,84 @@
+#!/bin/csh
+#
+#set pathh=`pwd`
+set startwk=$1
+set stopwk=$2
+
+while ( $startwk <= $stopwk )
+
+  if  ($startwk < 1000) then
+     set gpswk = 0$startwk
+  else
+     set gpswk = $startwk
+  endif
+
+cd $ANALYSIS/$gpswk/flt
+echo $ANALYSIS/$gpswk/flt
+#
+foreach i ( 1 2 3 )
+@ j=0
+foreach dpfile ( `ls *.postlog` )
+echo $dpfile
+     set nn=`cat $dpfile  | wc -c`
+echo $nn
+     if ( $nn <= 20000 ) then
+        @ j=$j + 1
+     endif
+end
+echo $j
+if ( $j >= 1 ) then
+
+if ( ! -e goodppp ) mkdir goodppp
+foreach file ( `ls *.postlog` )
+  set forfile = `basename $file .postlog`
+	echo $forfile
+  set num=`cat $file  | wc -c`
+  if ( $num <= 20000 ) then
+     /bin/mv -f $forfile*  goodppp
+  endif
+end
+#
+cat  *.daily | grep add_amb > amb
+set tmp1=`cat amb | wc -l`
+if ( `echo $tmp1` != 0 ) then
+     cut -c9-19 amb > tmp2
+     uniq tmp2 > tmp3
+
+     foreach daysite ( `cat tmp3` )
+          echo " $daysite have been add ambiguity!"
+     end
+
+     sed -e '1,$s/^/\/bin\/rm -f /'  < tmp3 > tmp4
+     sed -e '1,$s/$/*/'  < tmp4 > tmp5
+     csh tmp5
+     
+     /bin/cp -f amb ../qm
+     cd ../qm
+     /bin/cp -f ../flt/tmp3 .
+     gunzip *gz
+     csh amb
+
+# twice pppsolve for having add ambiguity day.
+    echo "#\!/bin/csh" >! make-flt-ppp2 
+    echo "setenv CAMP $ANALYSIS/$gpswk" >> make-flt-ppp2
+    foreach fileqm ( `cat tmp3` )
+        gunzip $fileqm*
+        echo " pppsolve `ls $fileqm*qm` " >> make-flt-ppp2
+    end
+    chmod +x make-flt-ppp2 
+    /bin/mv -f make-flt-ppp2 ../flt
+    cd ../flt
+    make-flt-ppp2
+    echo " the twice pppsolve have been done."
+# 
+endif
+
+/bin/rm tmp2 tmp3 tmp4 tmp5
+
+endif
+end
+
+ @ startwk = $startwk + 1
+end
+
+

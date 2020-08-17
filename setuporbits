@@ -1,0 +1,19 @@
+#!/bin/tcsh -f
+#setuporbits
+setenv allorbits /new_disk_dir/Allorbits_igb08
+foreach year (`ls $allorbits`)
+	foreach datee (`ls $allorbits/${year}`)		
+		set mon=`echo $datee|cut -c6-7`
+		set day=`echo $datee|cut -c9-10`
+		#echo ${year}-${mon}-${day}
+		set gweekd=`yyyymmdd2gweek ${year} ${mon} ${day}`
+		set gweek=$gweekd[1]
+		set nam=`basename $datee .gz`
+		if (-e $ANALYSIS/$gweek/orbit/$nam || -e $ANALYSIS/$gweek/orbit/$datee) then
+			
+			else
+				cp -f $allorbits/${year}/${year}-${mon}-${day}* $ANALYSIS/$gweek/orbit
+				echo $nam
+		endif	
+	end
+end

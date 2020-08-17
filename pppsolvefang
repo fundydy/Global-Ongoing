@@ -1,0 +1,426 @@
+#!/bin/csh 
+#
+#set echo on
+#
+#   PPPSOLVE
+#
+#   This is a wrapper arouns solve that allows many ppp solutions to be
+#   run at the same time without bogging down in file I/O.
+#
+#   The strategy is like this:
+#   1. Make a temporary campaign directory in local scratch space.
+#   2. Copy all needed files over to the scratch directory.
+#   3. Run the PPP solution
+#   4. Copy the results back
+#   5. Remove the local scratch directory
+#
+#   This has the advantage of limiting disk access to the main data archive
+#   disk to a couple of quick copies, and should speed runtime when the system
+#   is loaded.
+#
+#    8 Jun 2012: Added -delsat pass-through option
+#   21 Sep 2009: Modified command line parsing to add several options:
+#    7 Oct 2009: Added -orbdir pass-through option
+#   30 Oct 2009: Add -delete_shadow -tropmap -apriori_trop options by Yuning Fu 
+#   30 Nov 2009: Add -use_domes option by Yuning Fu
+#   06 Jan 2010: Add -use_azel option by Yuning Fu
+#   15 Jan 2010: Add -oceanload option by Yuning Fu
+#   11 Mar 2010: Add -old_tide_options pass-through option by Jeff Freymueller
+#                Added -qm and -ymdsta options
+#   12 Mar 2010: Add -compress option
+#   18 Mar 2010: Add -no_elev option
+#   17 Jul 2013: Add -kinematic option
+#   24 Oct 2013: Add -hrstatic option, make sure .trop file is copied back
+#
+#      (-qm qmfile | -ymdsta 07jun22lhaz)
+#      -orbfiletype (eci|pos)
+#      -orbdir    (dirname)
+#      -pcmodeltype (rel.pcv|rel.atx|abs.atx)
+#      -nf
+#      -kinematic (1|5|30|300)  # rate, in seconds
+#      -delsat GPSyy
+#      -old_tide_options
+#                 The options above are passed directly to solve.
+#      -pppdir DIR
+#                 Place output in subdirectory DIR instead of default
+#                 Default is current flt/ directory and post/PPP
+#                 This option changes it to flt/DIR and post/DIR
+#      -run_name NAME
+#                 use yymmmddNAME instead of qm filename as solution name
+#      -oceanload model
+#                 use oceanloading model "model"
+#      -compress
+#                 compress files on the local scratch disk before returning
+#      -no_elev
+#                 turn off elevation dependent phase centers
+#      -atx antexfile
+#                 use the specified antex file instead of default
+
+set orbfiletype = pos 
+set orbdir = ""
+set pcmodeltype = abs.atx
+set nf = " "           # This variable is also used for -hr, -5s and -1s flags
+set delsats = " "
+set ocnload = " "
+set oceanload = " "
+set delete_shadow = " "
+set tropmap = NIELL
+set apriori_trop = ELEV 
+set use_domes = " "
+set use_azel = " "
+set old_tide_options = " "
+set compress_files = 0
+set hrstatic = 0
+set kinematic = 0
+set no_elev = " "
+set antex = " "
+set quickqrnml = " "
+
+unset pppdir
+unset qmfile
+unset ymdsta
+unset qm_choice
+unset run_name
+
+set k = 1
+while ($k <= $#argv)
+
+  switch ($argv[$k])
+
+    case -qm:
+     @ k++
+     set qmfile = $argv[$k]
+     set qm_choice = qm
+     echo "Using qm file $qmfile"
+    breaksw
+
+    case -ymdsta:
+     @ k++
+     set ymdsta = ` echo $argv[$k] | awk '{print $0 "___"}' | awk '{print substr($0,1,11)}' `
+     set qm_choice = ymdsta
+     echo "Using all qm files for $ymdsta"
+    breaksw
+
+    case -pppdir:
+     @ k++
+     set pppdir = $argv[$k]
+     echo "Output files put in subdirectory $pppdir"
+    breaksw
+
+    case -hrstatic:
+     @ k++
+     set hrstatic = 1
+     set hrrate = $argv[$k]
+     echo "Estimating high rate solution with sample rate $hrrate (seconds)"
+    breaksw
+
+    case -kinematic:
+     @ k++
+     set kinematic = 1
+     set kinrate = $argv[$k]
+     echo "Estimating kinematic positions with rate $kinrate (seconds)"
+    breaksw
+
+    case -run_name:
+     @ k++
+     set run_name = $argv[$k]
+     echo "Using run name $run_name instead of qm filename"
+    breaksw
+
+    case -nf:
+     set nf = -nf
+     echo "Using non-fiducial orbits"
+    breaksw
+
+    case -delsat:
+     @ k++
+     set delsats = "$delsats -delsat $argv[$k]"
+     echo "Deleting satellite $argv[$k]"
+    breaksw
+
+    case -quickqrnml:
+     set quickqrnml = "-quickqrnml"
+     echo "Fast QREGRES nml: using cached namelist file"
+    breaksw
+
+    case -old_tide_options:
+     set old_tide_options = "-old_tide_options"
+     echo "Using old tide options"
+    breaksw
+
+    case -ocnload:
+     set ocnload = "-ocnload"
+     echo "Using OLD Ocean Load Model"
+    breaksw
+
+    case -oceanload:
+     @ k++
+     set oceanload = "-oceanload $argv[$k]"
+     echo "Using Ocean Load Model $argv[$k]"
+    breaksw
+
+    case -orbfiletype:
+     @ k++
+     set orbfiletype = $argv[$k]
+     switch ( $orbfiletype )
+        case eci:
+        case pos:
+           echo "Orbit file type set to $orbfiletype"
+        breaksw
+
+        default:
+           echo "Unrecognized orbit file type $orbfiletype"
+           exit 1
+        breaksw
+     endsw
+    breaksw
+
+    case -orbdir:
+     @ k++
+     set orbdir = $argv[$k]
+     echo "Using orbit directory $orbdir instead of default $CAMP/orbit"
+    breaksw
+
+    case -pcmodeltype:
+       @ k++
+       set pcmodeltype = $argv[$k]
+       switch ( $pcmodeltype )
+          case rel.pcv:
+          case abs.atx:
+          case nopcmodel:
+             echo "Phase center model type set to $pcmodeltype"
+          breaksw
+          default:
+             echo "Unrecognized phase center model file type $pcmodeltype"
+             exit 1
+          breaksw
+       endsw
+    breaksw
+
+    case -delete_shadow:
+       set delete_shadow = -delete_shadow
+       echo "Using shadow deleted data"
+    breaksw
+
+    case -use_domes:
+       set use_domes = -use_domes
+       echo "Using Domes correction"
+    breaksw
+
+    case -atx:
+     @ k++
+       set antex = "-atxfile $argv[$k]"
+       echo "Using ANTEX file $antex"
+    breaksw
+
+    case -use_azel:
+       set use_azel = -use_azel
+       echo "Using azel-dependent phase center models"
+    breaksw
+ 
+    case -no_elev:
+       set no_elev = -no_elev
+       echo "Ignoring elevation dependence in phase center models"
+    breaksw
+ 
+    case -tropmap:
+       @ k++
+       set tropmap = $argv[$k]
+       switch ( $tropmap )
+          case NIELL:
+          case GMF:
+              echo "Tropmap set to $tropmap"
+          breaksw
+
+          default:
+              echo "Unrecognized tropmap type $tropmap"
+              exit 1
+          breaksw
+       endsw
+    breaksw
+
+    case -apriori_trop:
+       @ k++
+       set apriori_trop = $argv[$k]
+       switch ( $apriori_trop )
+          case GPT:
+              echo "Apriori_trop set to $apriori_trop"
+          breaksw
+
+          default:
+              echo "Unrecognized Apriori type $apriori_trop"
+              exit 1
+          breaksw
+       endsw
+    breaksw
+
+    case -compress:
+       set compress_files = 1
+    breaksw
+ 
+    default:
+     set qmfile = $argv[$k]
+     set qm_choice = qm
+    breaksw
+
+  endsw
+
+  @ k++
+end
+
+#  Final setup, check, and set run_id
+#     Done different for the -qm and -ymdsta options
+
+if ( $qm_choice == qm ) then
+
+   if ( ! $?qmfile ) then
+      echo "Error in command line arguments. Command line was:"
+      echo $0
+      exit 1
+   endif
+
+   set ymd = `basename $qmfile | awk '{print substr($0,1,7)}'`
+   set baseqm = `basename $qmfile .qm`
+   if ( $?run_name ) then
+      set run_id = ${ymd}${run_name}
+   else
+      set run_id = $baseqm
+   endif
+
+else
+
+   if ( ! $?ymdsta ) then
+      echo "Error in command line arguments. Command line was:"
+      echo $0
+      exit 1
+   endif
+
+   set ymd = `echo $ymdsta | awk '{print substr($0,1,7)}'`
+   if ( $?run_name ) then
+      set run_id = ${ymd}${run_name}
+   else
+      set run_id = $ymdsta
+   endif
+
+endif
+
+# 1. Create the temporary campaign directory
+
+setenv CAMP_EXTERN $CAMP
+
+setenv CAMP $GSCR/camp.$$
+
+
+if ( -e $CAMP ) /bin/rm -fr $CAMP
+newcamp $CAMP
+
+# 2. Copy over all needed files
+
+
+if ( $qm_choice == qm ) then
+   /bin/cp -p $CAMP_EXTERN/qm/$baseqm.qm* $CAMP/qm
+else
+   /bin/cp -p $CAMP_EXTERN/qm/${ymdsta}*.qm* $CAMP/qm
+endif
+
+set orbdate = `ymd2yy-mm-dd $ymd`
+/bin/cp -p $CAMP_EXTERN/orbit/$orbdir/${orbdate}* $CAMP/orbit
+
+# 3. Run the PPP solution
+
+pushd $CAMP/flt
+
+set subnet = /tmp/subnet.$$
+
+#
+if ( $qm_choice == qm ) then
+   echo $qmfile | awk '{print substr($0,8,4)}' | tr '[a-z]' '[A-Z]' | sed s/_//g > $subnet
+else
+   echo $ymdsta | awk '{print substr($0,8,4)}' | tr '[a-z]' '[A-Z]' | sed s/_//g > $subnet
+endif
+
+#  Set namelist and orbit file based on data rate for kinematic solution
+
+if ( $kinematic ) then
+   switch ( $kinrate )
+
+    case 1:
+       set kinematic_namelist = /gipsy/filter/kinematic_rwalk_1s.fltnml
+       set nf = "$nf -1s"
+    breaksw
+
+    case 5:
+       set kinematic_namelist = /gipsy/filter/kinematic_rwalk_5s.fltnml
+       set nf = "$nf -5s"
+    breaksw
+
+    case 30:
+       set kinematic_namelist = /gipsy/filter/kinematic_rwalk_30s.fltnml
+       set nf = "$nf -hr"
+    breaksw
+
+    case 300:
+       set kinematic_namelist = /gipsy/filter/kinematic_rwalk_5m.fltnml
+    breaksw
+
+    otherwise:
+       echo "Set the kinematic rate to 1, 5, 30 or 300 seconds."
+       exit 1
+    breaksw
+   endsw
+   set strategy = "-nml $kinematic_namelist"
+else if ( $hrstatic ) then
+   switch ( $hrrate )
+
+    case 1:
+       set nf = "$nf -1s"
+    breaksw
+
+    case 5:
+       set nf = "$nf -5s"
+    breaksw
+
+    case 30:
+       set nf = "$nf -hr"
+    breaksw
+
+    otherwise:
+       echo "Set the sample rate to 1, 5, or 30 seconds."
+       exit 1
+    breaksw
+   endsw
+   set strategy = "-strategy PPP"
+else
+   set strategy = "-strategy PPP"
+endif
+
+#
+/usr/local/gipsy/bin/solve ${run_id} $nf $delsats $quickqrnml $strategy -orbfiletype $orbfiletype -pcmodeltype $pcmodeltype -elevmin 10 -tropmap $tropmap -apriori_trop $apriori_trop $ocnload $oceanload -subnet $subnet -ambresol $delete_shadow $use_domes $use_azel $antex $no_elev $old_tide_options >& ${run_id}.daily
+/bin/rm -f $CAMP/reg/${run_id}.reg* $CAMP/reg/${run_id}.qm* $CAMP/flt/${run_id}.qm
+
+if ( $compress_files )  gzip -f ${run_id}.*
+
+if ( -e $subnet ) /bin/rm -f $subnet
+
+# 4. Copy the results back
+
+/bin/cp -pf $CAMP/reg/${run_id}.* $CAMP_EXTERN/reg
+/bin/cp -pf $CAMP/trop/${run_id}.* $CAMP_EXTERN/trop
+if ( $?pppdir ) then
+   /bin/cp -pf $CAMP/flt/${run_id}.* $CAMP_EXTERN/flt/$pppdir
+   if ( ! $kinematic ) /bin/cp -pf $CAMP/post/PPP/${run_id}* $CAMP_EXTERN/post/$pppdir
+else
+   /bin/cp -pf $CAMP/flt/${run_id}.* $CAMP_EXTERN/flt
+   if ( ! $kinematic ) /bin/cp -pf $CAMP/post/${run_id}* $CAMP_EXTERN/post/PPP
+endif
+/bin/rm $CAMP_EXTERN/post/PPP/*
+/bin/cp -pf $CAMP/flt/${run_id}.daily /new_disk_dir/Results_IGb08/daily
+
+# 5. Delete the scratch directory and clean up
+
+popd    # undo the pushd earlier
+/bin/rm -fr $CAMP
+
+# Restore the value of $CAMP
+setenv CAMP $CAMP_EXTERN
+unsetenv CAMP_EXTERN

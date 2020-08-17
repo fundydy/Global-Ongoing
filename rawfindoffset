@@ -1,0 +1,8 @@
+#!/bin/csh -f
+#fundy 20200703
+#running under hector-work root dir
+foreach file (`ls ./raw_files/*.mom`)
+	set filename=`basename $file .mom`
+	find_offset.py $filename FNWN>>find.log
+	echo $filename
+end

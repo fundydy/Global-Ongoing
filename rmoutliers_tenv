@@ -1,0 +1,26 @@
+#!/bin/tcsh
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Generate time: 2020年 08月 03日 星期一 21:05:31 CST
+#===============================================================================
+#Main program
+#Usage: rmoutliers_tenv XZAR
+#use cleaned mom file to get cleaned tenv
+#under tenv dir
+foreach file (`ls *.mom`)
+	grep -v "#" $file>tmp
+	mv -f tmp $file
+	rm tmp 
+	set site=`basename $file .mom`
+	set tenv=`echo $site|cut -c1-4`
+	rm ${site}_clean.tenv
+	set num=`wc -l $file|awk '{print $1}'`
+	set count = 1
+	while ($count <= $num)
+		set mjd=`awk '{if(FNR=="'"$count"'")print $0}' $file|cut -c1-5 `
+		#echo $mjd
+		awk '$4 == "'"$mjd"'" ' $tenv.tenv>>${site}_clean.tenv
+		@ count++
+	end
+	
+end

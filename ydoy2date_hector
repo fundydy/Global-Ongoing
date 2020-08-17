@@ -1,0 +1,61 @@
+#!/bin/csh -f
+#
+#set echo on
+
+#
+# Get year and day
+#
+@ year=$1
+if ($year < 1900) then
+   @ year=$year + 1900
+endif
+set doy=$2
+#
+# Setup arrays
+#
+set indices=(1 2 3 4 5 6 7 8 9 10 11 12)
+set months=(jan feb mar apr may jun jul aug sep oct nov dec)
+#
+switch ($year)
+case 1980:
+case 1984:
+case 1988:
+case 1992:
+case 1996:
+case 2004:
+set days=(31 29 31 30 31 30 31 31 30 31 30 31)
+@ ndays=366
+breaksw
+
+default:
+set days=(31 28 31 30 31 30 31 31 30 31 30 31)
+@ ndays=365
+endsw
+#
+# test for valid day of year
+#
+if ($doy < 0 || $doy > $ndays) then
+   echo "Invalid day of year ($doy) for year $year"
+   exit 1
+endif
+
+#
+# Figure out month and day
+#
+@ i=1
+@ day=$doy
+while ($day > $days[$i])
+   @ day=$day - $days[$i]
+   @ i=$i + 1
+end
+set month=$indices[$i]
+#
+# Output date
+#
+if ($doy == 0 ) then
+	set day=31
+@ year=$year - 1
+set month=12
+endif
+
+echo $year $month $day 00 00 00

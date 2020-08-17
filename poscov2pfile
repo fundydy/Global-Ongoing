@@ -1,0 +1,17 @@
+#!/bin/tcsh    
+#
+# from GIPSY simplifed STACOV-files (POSCOV)
+# Written originally by Fundy 20200703
+mkdir pfiles
+cd poscov
+foreach olist ( `ls *.poscov` )
+	set site=`echo $olist |cut -c8-11`
+	set siteup = `echo $site | tr "[a-z]" "[A-Z]"`
+	cat $olist | egrep $siteup  >> $siteup.tmp
+end
+foreach tmp(`ls *.tmp`)
+	set site=`basename $tmp .tmp`
+ 	cat $tmp |sort | grep -v "*"> ../pfiles/$site.pfiles
+	echo $site
+end
+cd ..

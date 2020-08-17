@@ -1,0 +1,12 @@
+#!/bin/csh
+#mkdir orb in resentdir
+mkdir /poscov
+foreach file (`ls ./stacov`) 
+
+if (-e ./stacov/$file ) then
+	set name=`basename ./stacov/$file .stacov`
+	stacov2pos ./stacov/$file ./poscov/$name.poscov
+	
+else
+endif
+end

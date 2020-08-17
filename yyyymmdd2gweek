@@ -1,0 +1,16 @@
+#!/bin/csh -f
+#fundy 20200117
+if ($#argv < 1) then
+	echo ""
+	echo "usage: yyyymmdd2gweek 2018 05 06 -> 2000 000 "
+	echo ""
+	exit
+endif
+if ($#argv == 3) then
+	set ydoy=`/opt/gamit10.7/com/ymd2ydoy $1 $2 $3`
+	set year=$ydoy[1]
+	set doy=$ydoy[2]
+	set yr=`echo $year|cut -c3-4`
+	gweek $doy $yr
+endif
+

@@ -1,0 +1,28 @@
+#!/bin/tcsh
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Generate time: 2020年 08月 10日 星期一 13:41:28 CST
+#===============================================================================
+#Main program
+#Usage: apply_period2tenv
+
+set site=$1
+set perfile=${site}.seasonal
+set tenv=${site}.tenv
+set num=`wc -l $tenv|awk '{print $1}'`
+set count = 1	
+echo $tenv
+rm ${site}_period.tenv
+while ($count <= $num)
+	set ymd=`awk  '{if(FNR=="'"$count"'")print $2}' $tenv |tr A-Z a-z`
+	set u0=`awk  '{if(FNR=="'"$count"'")print $9}' $tenv`
+	set duv=`grep -RI $ydate $modfile|awk -F, '{print $2}'`
+	set p1=`awk  '{if(FNR=="'"$count"'")print $0}' $tenv|cut -f1-7 `
+	set p2=`awk  '{if(FNR=="'"$count"'")print $0}' $tenv|cut -f9- `
+	set corru=`awk -v aa=$duv -v bb=$u0 'BEGIN{printf "%8.6f",aa+bb}'`
+	set final=`echo $p1"	"$corru"	"$p2`
+	printf "%d / %d\r" $count $num
+	echo $final>>${site}_load.tenv
+@ count++
+end
+

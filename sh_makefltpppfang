@@ -1,0 +1,53 @@
+#!/bin/csh
+#
+if ( $#argv == 0 ) then
+echo "                                      "
+echo  " USAGE :   sh_makefltpppfang week1 week2 "
+echo  "                                     "
+endif
+#
+set startwk=$1
+set stopwk=$2
+#
+#
+qmnamesup2low
+echo "qmnamesup2low completed"
+#
+while ( $startwk <= $stopwk )
+
+  if  ($startwk < 1000) then
+     set gpswk = 0$startwk
+  else
+     set gpswk = $startwk
+  endif
+
+if ( -d $ANALYSIS/$gpswk/qm ) then
+echo $startwk
+cd $ANALYSIS/$gpswk/qm
+gunzip *gz
+echo "#\!/bin/tcsh " >! make-flt-ppp
+echo "#"  >> make-flt-ppp
+echo "setenv CAMP $ANALYSIS/$gpswk" >> make-flt-ppp
+echo "#"  >> make-flt-ppp
+##
+ls -l *.qm > aa
+cat aa | cut -c47- > bb
+cat bb | cut -c1-18 > cc
+cat cc >> make-flt-ppp
+rm aa
+rm bb
+rm cc
+##pppsolvefang 18may06j036____0b -delsat GPS62 -delsat GPS63 -tropmap GMF -oceanload tpxo7only_CM -apriori_trop GPT -use_domes -use_azel
+#gunzip *kmin*qm.gz
+#ls *kmin*.qm >> make-flt-ppp
+sed -e '5,$s/^/  pppsolvefang   /' < make-flt-ppp > tt
+sed -e '5,$s/$/  -nf -delsat GPS62 -delsat GPS63 -tropmap GMF -oceanload tpxo7only_CM -apriori_trop GPT -use_domes -use_azel/' < tt > tt1
+rm tt
+/bin/mv -f tt1 make-flt-ppp
+chmod +x make-flt-ppp
+/bin/mv make-flt-ppp $ANALYSIS/$gpswk/flt
+@ startwk = $startwk + 1
+else
+ @ startwk = $startwk + 1
+endif
+end

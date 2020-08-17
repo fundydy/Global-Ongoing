@@ -1,0 +1,15 @@
+#!/bin/csh
+#mkdir orb in resentdir
+mkdir orb
+cd orb
+foreach file (`ls ..`) 
+
+if (-e ../$file ) then
+	set name=`nametrans ../$file`
+	echo nameis$name
+	set ymd=`echo $name|cut -c-7`
+	echo ymdis$ymd
+	ftpOrbitfang -ddate $ymd
+else
+endif
+end

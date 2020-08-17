@@ -1,0 +1,50 @@
+#!/bin/tcsh
+#Example:	gfz_load_data tibet.camp.ll 
+#-nph
+#
+set name=`basename $1 .ll`
+set n=`wc -l <$1`
+set i=1
+set type=0
+set type=$2
+if($type == 0)then
+while ($i <= $n)
+	set line=(`awk '{if(NR == '"$i"')print $1,$2,$3}' $1`)
+	set staname=${line[3]}
+	set lat = ${line[2]}
+	set lon = ${line[1]}
+	echo ${staname}_ntal.txt
+if (-e ${staname}_ntal.txt) then
+	echo "${staname}_ntal already exists"
+	else
+	extractlatlon_bilinintp_remote NTAL24h CM 1998-01-01 2020-01-01 $lon $lat -v duV -o ${staname}_ntal
+endif
+if (-e ${staname}_hydl.txt) then
+	echo "${staname}_hydl already exists"
+	else
+	extractlatlon_bilinintp_remote HYDL CM 1998-01-01 2020-01-01 $lon $lat -v duV -o ${staname}_hydl
+endif
+if (-e ${staname}_nph.txt) then
+	echo "${staname}_nph already exists"
+	else
+	extractlatlon_bilinintp_remote NTAL+HYDL CM 1998-01-01 2020-01-01 $lon $lat -v duV -o ${staname}_nph
+endif
+	echo ${staname}"_done"
+	@ i ++
+end
+else
+while ($i <= $n)
+	set line=(`awk '{if(NR == '"$i"')print $1,$2,$3}' $1`)
+	set staname=${line[3]}
+	set lat = ${line[2]}
+	set lon = ${line[1]}
+
+if (-e ${staname}_nph.txt) then
+	echo "${staname}_nph already exists"
+	else
+	extractlatlon_bilinintp_remote NTAL+HYDL CM 1998-01-01 2020-01-01 $lon $lat -v duV -o ${staname}_nph
+endif
+	echo ${staname}"_done"
+	@ i ++
+end
+end

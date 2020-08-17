@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Generate time: 2020年 08月 12日 星期三 20:18:08 CST
+#For U comp
+
+#Usage: mad4tenv XZAR.tenv
+#output XZAR_ori.tenv XZAR_mad.tenv
+import sys
+import numpy as np
+import pandas as pd
+import os
+
+def madmethod(x):
+#estimate trend and rm
+	trend=np.polyfit(x[:,0],x[:,1],1)
+	p=np.poly1d(trend)
+#	print(p)
+	x[:,1]=x[:,1]-p(x[:,0])
+#	print(np.size(gmt))
+#mad
+	array=x[:,1]
+	med=np.median(array)
+	b=1.4826
+	mad=b*np.median(np.abs(array-med))
+#	print(mad)
+	low=med-(3*mad)
+	up=med+(3*mad)
+	arr=x[(x[:,1]>low) & (x[:,1]<up),:]
+#	print(np.size(arr))
+#add trend
+	arr[:,1]=arr[:,1]+p(arr[:,0])
+	arr[:,1]=arr[:,1]-np.mean(arr[:,1])
+	return arr
+
+
+#===============================================================================
+#Main program
+filename=sys.argv[1]
+tenv=pd.read_csv(filename,header=None,sep='\s+')
+tenv.columns=["st","ymd","dyr","mjd","gw","gd","e","n","u","zero","de","dn","du","ce","cn","cu"]
+dyru=tenv[["dyr","u"]]
+dyru=np.array(dyru)
+
+
+mad0=madmethod(dyru)
+minvalue=np.min(mad0,axis=0)
+maxvalue=np.max(mad0,axis=0)
+y=np.array([np.absolute(minvalue[1]),np.absolute(maxvalue[1])])
+ylength=np.max(y,axis=0)
+yl=np.ceil(ylength/10)*10*1.2
+while yl>1:
+	mad0=madmethod(mad0)[:,:]
+	minvalue=np.min(mad0,axis=0)
+	maxvalue=np.max(mad0,axis=0)
+	y=np.array([np.absolute(minvalue[1]),np.absolute(maxvalue[1])])
+	ylength=np.max(y,axis=0)
+	y0=np.ceil(ylength/10)*10*1.2
+	if y0==yl:
+		break
+	else:
+		yl=y0
+
+tenv=tenv[tenv["dyr"].isin(mad0[:,0])]
+tenv["u"]=mad0[:,1]
+tenv.to_csv(filename,header=None,sep='\t',index=False,float_format='%.6f')
+

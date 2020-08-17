@@ -1,0 +1,17 @@
+#!/bin/csh -f
+#fundy 20200703
+#running under ori_files dir
+cd ori_files
+foreach tenvf(`ls *.tenv`)
+	set site=`basename $tenvf .tenv`
+	awk '{print $4,$7*1000}' $tenvf>${site}_0.mom
+	awk '{print $4,$8*1000}' $tenvf>${site}_1.mom
+	awk '{print $4,$9*1000}' $tenvf>${site}_2.mom
+	sed -i '1i\# sampling period 1.0' ${site}*.mom
+	#delete repeat time
+	sort -k 1 -nu ${site}_0.mom -o ${site}_0.mom
+	sort -k 1 -nu ${site}_1.mom -o ${site}_1.mom
+	sort -k 1 -nu ${site}_2.mom -o ${site}_2.mom
+end
+mv *.mom ../raw_files
+cd ..

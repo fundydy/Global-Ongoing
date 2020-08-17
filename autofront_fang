@@ -1,0 +1,101 @@
+#!/bin/csh
+#
+#      autofront
+#
+##BRIEF
+# Autofront is a script intended to run under cron that carried out the initial 
+# "front end" processing on a set of GPS data files hopper directory.
+#
+##AUTHOR
+# Dr. Jeffrey T. Freymueller
+#
+##DATE
+# n/a
+#
+##DETAILS
+# This script is intended to be run periodically by cron. It
+# does the following tasks:<br/>
+#  - run rnx2qm on all files in the hopper, putting the edited rinex<br/>
+#    and qm files in the appropriate analysis directory.<br/>
+#  - files in the hopper must be compressed: *o.gz, *d.gz, *o.Z, *d.Z
+#  - move files from the hopper into daily archive directories<br/>
+#  - warn operator of duplicate files rather than processing them<br/>
+#
+###########################################################################
+
+#+#   Move files from the hopper into the data archive
+#+#   Copy files from the hopper into the analysis area
+#+#      Don't overwrite anything, instead send mail to operator
+
+#setenv ANALYZED
+#setenv TOTAPE
+
+#+#  Refers to variables
+#+#   RAWDATA
+#+#   ANALYSIS
+#+#   ANALYZED
+#+#   DATA
+
+if ( -e /tmp/dups.$$ ) /bin/rm -f /tmp/dups.$$
+
+foreach file ( $RAWDATA/hopper/*.??d.Z  $RAWDATA/hopper/*.??d.gz $RAWDATA/hopper/*.??o.Z $RAWDATA/hopper/*.??o.gz  )
+   if ( -e $file ) then
+      set base=`basename $file`
+      echo "Starting on file $base"
+      set yr = `echo $base | awk -F. '{print substr($2,1,2)}'`
+      set basenm = `echo $base | awk -F. '{print $1"."$2}'`
+      @ year = 1900 + $yr
+      if ($year < 1980) @ year += 100
+      set doy=`echo $base | awk '{print substr($0,5,3)}'`
+      set arcdir="$RAWDATA/${year}/${doy}"
+      if (! -e $RAWDATA/${year} ) mkdir $RAWDATA/${year}
+      if (! -e $arcdir) mkdir $arcdir
+
+      set gpswk=`gweek $doy $yr | awk '{print $1}'`
+      set procdir=$ANALYSIS/${gpswk}
+      #if (! -e $procdir) mkdir $procdir
+#+#     Files which arrive very late should go into the MAILBAG directory.
+
+ #     if ( -e $ANALYZED/$gpswk ) then
+ #        echo "RINEX file is a late arrival: Sending file to Mailbag directory"
+ #        set procdir = $MAILBAG
+ #     endif
+
+      #if ( -e $arcdir/$base ) then
+      if ( -e $arcdir/$basenm.Z || -e $arcdir/$basenm.gz  ) then
+         echo "File exists in raw archive: $year/$doy/$base" >> /tmp/dups.$$
+#        echo "File exists in raw archive: $year/$doy/$base"
+      else
+#+#        Create campaign directory if it doesn't exist
+         if (! -e $procdir) then
+            make_new_camp_dir $gpswk
+         endif
+
+         rnx2qm $file -dir $procdir >& /tmp/rnx2qm.$$
+         cat /tmp/rnx2qm.$$
+         set failed = `grep "rnx2qm: failed" /tmp/rnx2qm.$$ | wc -l`
+         if ( $failed ) then
+            /bin/mv -f $file $RAWDATA/failed
+         else
+            /bin/mv -f $file $arcdir
+         endif
+         /bin/rm -f /tmp/rnx2qm.$$
+      endif
+   endif
+end
+
+#+#    Warn operator of duplicate files if any
+
+if ( -e /tmp/dups.$$ ) then
+   set mailfile=/tmp/dailyrequest.mail.$$
+   cat <<EOF > $mailfile
+From dailyrequest:     Operator intervention required
+
+Some files in the hopper already exist on the archive!!
+
+EOF
+  cat /tmp/dups.$$ >> $mailfile
+  mail -s "dailyrequest: duplicate files in hopper" $GPSOP < $mailfile
+endif
+
+/bin/rm -f /tmp/dups.$$

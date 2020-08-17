@@ -1,0 +1,15 @@
+#!/bin/tcsh -f
+#run this script under Allorbits dir
+
+foreach year (`ls .`)
+	foreach mon (`ls ./${year}`)
+		foreach day (`ls ./${year}/${mon}`)
+			mv /new_disk_dir/JPL_GPS_Products/*/${year}-${mon}-${day}* ./${year}/${mon}/${day}
+#			mv /new_disk_dir/JPL_GPS_Products/1900/${year}-${mon}-${day}* ./${year}/${mon}/${day}
+#			mv /new_disk_dir/JPL_GPS_Products/1600/${year}-${mon}-${day}* ./${year}/${mon}/${day}
+#			mv /new_disk_dir/JPL_GPS_Products/1380/${year}-${mon}-${day}* ./${year}/${mon}/${day}
+#			mv /new_disk_dir/JPL_GPS_Products/1372/${year}-${mon}-${day}* ./${year}/${mon}/${day}
+			echo ${year}-${mon}-${day}
+		end
+	end
+end

@@ -1,0 +1,13 @@
+#!/bin/csh -f
+foreach gweek(`ls $ANALYSIS`)
+cd $ANALYSIS/$gweek/qm
+foreach file(`ls *.*`)
+	set newfile = `echo $file | tr "[A-Z]" "[a-z]"`
+if  (-e $newfile) then
+     
+  else
+     mv -f $file $newfile
+  endif
+end
+echo $gweek
+end

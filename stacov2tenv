@@ -1,0 +1,21 @@
+#!/bin/tcsh
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Usage: stacov2tenv
+#Description: Run under postworkdir
+#Generate time: 2020年 08月 13日 星期四 16:31:57 CST
+#Main program
+#===============================================================================
+stacov2poscovfang >tmp
+rm tmp
+echo "poscov ok"
+poscov2pfile
+echo "pfiles ok"
+pfiles2tenv
+echo "tenv ok"
+cd tenv
+foreach ss (`ls *.tenv`)
+	set site=`basename $ss .tenv`
+	ts_u.sh $site
+	echo $site".png ok"
+end

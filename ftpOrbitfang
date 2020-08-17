@@ -1,0 +1,180 @@
+#!/bin/csh -f
+#
+
+#!/bin/csh
+#20191211 capitalization||lowercase and http support
+if ( $#argv == 0 ) then
+echo "                                                                  "
+echo " Generate a script for automatically analyzing GPS data week by   "
+echo "  week , net by net  using SOLVE of GIPSY                         "
+echo "                                                                  "
+echo "                                                                  "
+echo "  USAGE :   ftpOrbityang  <option>                               "
+echo "                                                                  "
+echo "  EXAMPLES:                                                       "
+echo "                                                                  "
+echo "  ftpOribtyang -dweek 855  1280  1234  ...                       "
+echo "  ftpOrbityang -dweekd 12763 08552     ...                       "
+echo "  ftpOrbityang -sweek  1276 1280                                 "
+echo "  ftpOrbityang -sweek  603  605                                  "
+echo "  ftpOrbityang -sdate 02jan01 02feb09                            "
+echo "  ftpOrbityang -ddate 02jan01 02feb19 03oct23 ...                "
+echo "  ftpOrbityang -ddoy 02 123 134 321 12 ...                       "
+echo "  ftpOrbityang -sdoy 02 231 256                                  "
+echo "  ftpOrbityang -sort exam.list                                   "
+echo "                                                                  "
+echo "                                                                  "
+echo "  ddate : date where data are be processed e.g. 04mar13 02feb21   "
+echo "  sdate : data is processed from starting date  to ending         "
+echo "          date  03ma01 03oct21                                    "
+echo "  dweek : GPS weeks where data are be processed e.g. 1531  1789   "
+echo "  sweek : start week from it to ending week  1531  1789           "
+exit
+endif
+#
+#
+set gwks = ' '
+set doys = ' '
+set dates = ' '
+set sorted = 0
+set k = 1
+#
+while ($#argv > 0 )
+  set input = ( $argv )
+  switch($input[1])
+    case -clock:
+        set clock = $argv[2]
+    breaksw
+    case -sort:
+        set sorted = 1
+        set sortf = $argv[2]
+        echo $sortf
+    breaksw
+    case -pro:
+        set extra = pro
+    breaksw
+    case -sdate:
+        set sorted = 2
+        set startd =  ` ymd2ydoy $argv[2] | awk  '{print $2}' `
+        set startyr = ` ymd2ydoy $argv[2] | awk  '{print $1}' `
+        set endd =  ` ymd2ydoy $argv[3] | awk  '{print $2}' `
+        set endyr = ` ymd2ydoy $argv[3] | awk  '{print $1}' `
+        @ count = $startd
+        while ( $count <= $endd )
+          set date = ` ydoy2ymd $startyr $count `
+          set dates = ($dates $date)
+          @ count = $count + 1
+        end
+#       echo $dates
+    breaksw
+    case -ddate:
+        set dates = (`echo $argv[1-] | cut -d- -f2`); shift dates
+       echo $dates
+        set sorted = 2
+    breaksw
+    case -ddoy:
+        set sorted = 2
+        set year = $argv[2]
+        set doys = (`echo $argv[2-] | cut -d- -f1`); shift doys
+        foreach doy ( $doys )
+          set dates = ($dates `ydoy2ymd $year $doy `)
+        end
+    breaksw
+    case -sdoy:
+        set sorted = 2
+        set year = $argv[2]
+        @ count = $argv[3]
+        while ( $count <= $argv[4] )
+          set doys = ($doys $count)
+          @ count = $count + 1
+        end
+        foreach doy ( $doys )
+          set dates = ($dates `ydoy2ymd $year $doy `)
+        end
+    breaksw
+    case -dweek:
+        set gwks = (`echo $argv | cut -d- -f2`); shift gwks
+    breaksw
+    case -dweekd:
+        set gwks = (`echo $argv | cut -d- -f2`); shift gwks
+        set sorted = 2
+        foreach gwk ( $gwks )
+          set doy = (`gweek $gwk | awk '{print $1}'`)
+          set year = (`gweek $gwk | awk '{print $2}'`)
+          set dates = ($dates `ydoy2ymd $year $doy`)
+        end
+    breaksw
+    case -sweek:
+        @ count = $argv[2]
+        while ( $count <= $argv[3] )
+          set gwks = ($gwks $count)
+          @ count = $count + 1
+        end
+    breaksw
+  endsw
+  if ( $#argv > 0 ) shift argv
+end
+alldone:
+#
+set inidat = `date +"%F"`
+set initim = `date +"%T" `
+#
+if ( $sorted == 0 ) then
+#
+  foreach gpswk ( $gwks )
+#
+     if ( $gpswk < 1000 ) then
+        set gpswk = 0$gpswk
+     else
+        set gpswk = $gpswk
+     endif
+#
+     set wkdays = ' 0 1 2 3 4 5 6 '
+     foreach day (  $wkdays )
+        set doy0 = ( `gweek ${gpswk}${day} | awk '{print $1}'` )
+        set year0 = ( `gweek ${gpswk}${day} | awk '{print $2}'` )
+        set dates = ($dates `ydoy2ymd $year0 $doy0`)
+     end
+  end
+endif
+#
+foreach gdate ( $dates )
+    set yr = ` ymd2ydoy  ${gdate} | awk '{print $1}' `
+    
+@ year=$yr + 1900
+if ( $year < 1980 ) @ year = $yr + 2000
+    
+    set mon1=`echo $gdate | awk '{printf(substr($0,3,3))}'`
+    set dat=`echo $gdate | awk '{printf(substr($0,6,2))}'`
+     if ( $mon1 == jan ||$mon1 == JAN) set mon=01
+     if ( $mon1 == feb ||$mon1 == FEB) set mon=02
+     if ( $mon1 == mar ||$mon1 == MAR) set mon=03
+     if ( $mon1 == apr ||$mon1 == APR) set mon=04
+     if ( $mon1 == may ||$mon1 == MAY) set mon=05
+     if ( $mon1 == jun ||$mon1 == JUN) set mon=06
+     if ( $mon1 == jul ||$mon1 == JUL) set mon=07
+     if ( $mon1 == aug ||$mon1 == AUG) set mon=08
+     if ( $mon1 == sep ||$mon1 == SEP) set mon=09
+     if ( $mon1 == oct ||$mon1 == OCT) set mon=10
+     if ( $mon1 == nov ||$mon1 == NOV) set mon=11
+     if ( $mon1 == dec ||$mon1 == DEC) set mon=12
+
+echo "Getting ORBIT(gipsy)from JPL(sideshow.JPL.nasa.gov "
+cd /new_disk_dir/Allorbits_igb08/${year}
+  tsocks wget -r -A "$year-$mon-${dat}*" -np -nd https://sideshow.jpl.nasa.gov/pub/JPL_GPS_Products_IGb08/Final/$year/ >> /tmp/orbdown.log 
+#JPL_GPS_Products_2.0
+#JPL_GPS_Products_IGb08
+#  tsocks wget -r -A "$year-$mon-${dat}.*.gz","$year-$mon-${dat}_nf.*.gz" -np -nd https://sideshow.jpl.nasa.gov/pub/JPL_GPS_Products_2.0/Final/$year/ >> /tmp/orbdown.log 
+#  tsocks wget -c  https://sideshow.jpl.nasa.gov/pub/JPL_GNSS_Products/Final/$year/$year-$mon-$dat*. 
+#ftp -inv sideshow.JPL.nasa.gov  << EOF
+#user anonymous whgps@public.wh.hb.cn
+#binary
+#cd /pub/gipsy_products/$year/orbits
+# mget $year-$mon-$dat*
+#mget $year-$mon-$dat.eci.Z
+#mget $year-$mon-$dat.tdpc.Z
+#mget $year-$mon-${dat}tpeo.nml.Z
+#quit
+#EOF
+
+end

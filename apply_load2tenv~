@@ -1,0 +1,33 @@
+#!/bin/tcsh
+# -*- coding: UTF-8 -*-
+#===============================================================================
+#Generate time: 2020年 08月 07日 星期五 21:52:35 CST
+#===============================================================================
+#Main program
+#Usage: apply_load2tenv XZAR hydl/ntal
+set site=$1
+set mod=$2
+set modfile=${site}_${mod}.txt
+set tenv=${site}.tenv
+set num=`wc -l $tenv|awk '{print $1}'`
+set count = 1	
+echo $tenv
+rm ${site}_load.tenv
+while ($count <= $num)
+	set ymd=`awk  '{if(FNR=="'"$count"'")print $2}' $tenv |tr A-Z a-z`
+	set u0=`awk  '{if(FNR=="'"$count"'")print $9}' $tenv`
+	set ymdd=`ymd2yyyymmdd $ymd`
+	set year=`echo $ymdd|cut -c1-4`
+	set mon=`echo $ymdd|cut -c5-6`
+	set day=`echo $ymdd|cut -c7-8`
+	set ydate=$year'-'$mon'-'$day
+	set duv=`grep -RI $ydate $modfile|awk -F, '{print $2}'`
+	set p1=`awk  '{if(FNR=="'"$count"'")print $0}' $tenv|cut -f1-7 `
+	set p2=`awk  '{if(FNR=="'"$count"'")print $0}' $tenv|cut -f9- `
+	set corru=`awk -v aa=$duv -v bb=$u0 'BEGIN{printf "%8.6f",aa+bb}'`
+	set final=`echo $p1"	"$corru"	"$p2`
+	printf "%d / %d\r" $count $num
+	echo $final>>${site}_load.tenv
+@ count++
+end
+

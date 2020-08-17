@@ -1,0 +1,7 @@
+#!/bin/csh
+#
+cd `pwd`
+foreach aa (`ls .`)
+	set name=`nametrans $aa`
+	mv $aa $name
+end
